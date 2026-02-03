@@ -1,0 +1,152 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("TURSO_DATABASE_URL")
+  directUrl = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  role      String   @default("user") // admin, user
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  settings  CompanySettings?
+}
+
+model Contact {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   // supplier, customer
+  email       String?
+  phone       String?
+  address     String?
+  balance     Float    @default(0) // positive = receivable, negative = payable
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  inventory   Inventory[]
+  sales       Sales[]
+  transactions TransactionLog[]
+}
+
+model Inventory {
+  id            String   @id @default(cuid())
+  invoiceNumber String   @unique
+  contactId     String
+  woodType      String
+  length        Float    // P in cm
+  d1            Float    // diameter 1 in cm
+  d2            Float    // diameter 2 in cm
+  d3            Float    // diameter 3 in cm
+  d4            Float    // diameter 4 in cm
+  trim          Float    @default(0) // trim in cm
+  gr            Float    @default(0) // Gubal/Rongga diameter in cm
+  avgDiameter   Float    // calculated average diameter
+  effectiveLength Float  // calculated effective length (P - Trim)
+  grossVolume   Float    // calculated gross volume in m³
+  grVolume      Float    @default(0) // calculated GR volume in m³
+  netVolume     Float    // calculated net volume in m³
+  unitPrice     Float    // calculated unit price
+  totalValue    Float    // calculated total value
+  status        String   @default("available") // available, sold, processed
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  contact       Contact @relation(fields: [contactId], references: [id])
+  sales         Sales?
+}
+
+model Sales {
+  id            String   @id @default(cuid())
+  invoiceNumber String   @unique
+  contactId     String
+  inventoryId   String?  @unique
+  woodType      String?
+  length        Float?
+  d1            Float?
+  d2            Float?
+  d3            Float?
+  d4            Float?
+  trim          Float    @default(0)
+  gr            Float    @default(0)
+  avgDiameter   Float?
+  effectiveLength Float?
+  grossVolume   Float?
+  grVolume      Float    @default(0)
+  netVolume     Float?
+  unitPrice     Float
+  totalPrice    Float
+  status        String   @default("pending") // pending, completed, cancelled
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  contact       Contact @relation(fields: [contactId], references: [id])
+  inventory     Inventory? @relation(fields: [inventoryId], references: [id])
+  transactions  TransactionLog[]
+}
+
+model TransactionLog {
+  id            String   @id @default(cuid())
+  contactId     String?
+  type          String   // income, expense
+  category      String   // sales, purchase, salary, fuel, maintenance, etc.
+  amount        Float
+  description   String?
+  referenceId   String?  // can reference sales, inventory, or expense ID
+  referenceType String?  // sales, inventory, expense
+  paymentMethod String?  // cash, transfer, etc.
+  expenseId     String?  @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  contact       Contact? @relation(fields: [contactId], references: [id])
+  sales         Sales[]
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  category    String   // salary, fuel, maintenance, electricity, water, etc.
+  amount      Float
+  description String?
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CompanySettings {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  companyName   String
+  address       String?
+  phone         String?
+  email         String?
+  taxId         String?
+  logo          String?
+  currency      String   @default("IDR")
+  dateFormat    String   @default("dd/MM/yyyy")
+  backupEnabled Boolean  @default(false)
+  lastBackup    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  user          User @relation(fields: [userId], references: [id])
+}
